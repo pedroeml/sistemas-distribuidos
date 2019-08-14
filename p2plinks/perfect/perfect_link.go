@@ -21,7 +21,7 @@ func (ppl *Link) Init() *Link {
 	ppl.indChannel = make(chan messages.IndMessage)
 	ppl.reqChannel = make(chan messages.ReqMessage)
 	ppl.cache = make(map[string] net.Conn)
-	ppl.isRunning = true
+	ppl.isRunning = false
 
 	return ppl
 }
@@ -48,8 +48,12 @@ func (ppl *Link) PushReqMessageToChannel(message messages.ReqMessage) {
 }
 
 func (ppl *Link) Start(address string) {
-	go ppl.EstablishConnection(address)
-	go ppl.KeepSending()
+	if !ppl.IsRunning() {
+		ppl.isRunning = true
+
+		go ppl.EstablishConnection(address)
+		go ppl.KeepSending()
+	}
 }
 
 func (ppl *Link) EstablishConnection(address string) {
