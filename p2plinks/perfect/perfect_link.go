@@ -30,6 +30,14 @@ func NewPerfectLink() *Link {
 	return new(Link).Init()
 }
 
+func (ppl *Link) GetIndChannel() chan messages.IndMessage {
+	return ppl.indChannel
+}
+
+func (ppl *Link) GetReqChannel() chan messages.ReqMessage {
+	return ppl.reqChannel
+}
+
 func (ppl *Link) IsRunning() bool {
 	return ppl.isRunning
 }

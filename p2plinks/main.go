@@ -1,8 +1,8 @@
 package main
 
 import (
-	"./perfect"
-	"./perfect/messages"
+	"./broadcast"
+	"./broadcast/messages"
 	"./utils"
 	"bufio"
 	"fmt"
@@ -14,34 +14,37 @@ func main() {
 	id, _ := strconv.Atoi(os.Args[1])
 	ipAddresses := utils.ParseAddressFile(os.Args[2])
 
-	var sourceIpAddress string
-	var targetIpAddress string
-
-	if id == 0 {
-		sourceIpAddress = ipAddresses[0]
-		targetIpAddress = ipAddresses[1]
-	} else if id == 1 {
-		sourceIpAddress = ipAddresses[1]
-		targetIpAddress = ipAddresses[0]
-	} else {
-		fmt.Printf("PROCESS %d: Only 2 addresses supported for now!", id)
+	if id >= len(ipAddresses) {
+		fmt.Printf("ID out of bounds! Max ID allowed %d", len(ipAddresses) - 1)
 		return
 	}
 
-	fmt.Printf("PROCESS %d: from %s is messaging to %s\n", id, sourceIpAddress, targetIpAddress)
+	sourceIpAddress := ipAddresses[id]
+	targetIpAddresses := make([]string, len(ipAddresses) -1, len(ipAddresses) -1)
+	index := 0
+
+	fmt.Printf("PROCESS %d: from %s is messaging to ", id, sourceIpAddress)
+	for i := 0; i < len(ipAddresses); i++ {
+		if i != id {
+			targetIpAddresses[index] = ipAddresses[i]
+			fmt.Printf("%s ", targetIpAddresses[index])
+			index++
+		}
+	}
+	fmt.Printf("\n")
 
 	ch := make(chan int)
 
-	ppl := perfect.NewPerfectLink()
-	ppl.Start(sourceIpAddress)
+	beb := broadcast.NewBestEffortBroadcast()
+	beb.Start(sourceIpAddress)
 
-	go sendKeyboardInputMessage(ppl, id, targetIpAddress)
-	go listenReceivingMessages(ppl, id, targetIpAddress)
+	go sendKeyboardInputMessage(beb, id, targetIpAddresses)
+	go listenReceivingMessages(beb, id)
 
 	<- ch
 }
 
-func sendKeyboardInputMessage(ppl *perfect.Link, id int, targetIpAddress string) {
+func sendKeyboardInputMessage(beb *broadcast.BestEffortBroadcast, id int, targetIpAddresses []string) {
 	for {
 		fmt.Println("Type the message:")
 		reader := bufio.NewReader(os.Stdin)
@@ -52,15 +55,20 @@ func sendKeyboardInputMessage(ppl *perfect.Link, id int, targetIpAddress string)
 			continue
 		}
 
-		reqMsg := *messages.NewReqMessage(targetIpAddress, msg)
-		fmt.Printf("PROCESS %d: sent message \"%s\" to %s\n", id, reqMsg.Message(), targetIpAddress)
-		ppl.PushReqMessageToChannel(reqMsg)
+		reqMsg := *messages.NewReqMessage(targetIpAddresses, msg)
+		fmt.Printf("PROCESS %d: sent message \"%s\" to ", id, reqMsg.Message())
+		for i := 0; i < len(targetIpAddresses); i++ {
+			fmt.Printf("%s ", targetIpAddresses[i])
+		}
+		fmt.Printf("\n")
+
+		beb.PushReqMessageToChannel(reqMsg)
 	}
 }
 
-func listenReceivingMessages(ppl *perfect.Link, id int, targetIpAddress string) {
+func listenReceivingMessages(beb *broadcast.BestEffortBroadcast, id int) {
 	for {
-		msg := ppl.PopIndMessageFromChannel()
-		fmt.Printf("PROCESS %d: got message \"%s\" from %s\n", id, msg.Message(), targetIpAddress)
+		msg := beb.PopIndMessageFromChannel()
+		fmt.Printf("PROCESS %d: got message \"%s\" from %s\n", id, msg.Message(), msg.From())
 	}
 }
