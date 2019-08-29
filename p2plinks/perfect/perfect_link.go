@@ -121,9 +121,10 @@ func (ppl *Link) Send(message messages.ReqMessage) {
 		conn = ppl.OpenConnection(message)
 	}
 
-	fmt.Printf("DEBUG: Sending message \"%s\" to %s\n", message.Message(), message.To())
-
-	fmt.Fprintf(conn, message.Message())
+	if conn != nil {
+		fmt.Printf("DEBUG: Sending message \"%s\" to %s\n", message.Message(), message.To())
+		fmt.Fprintf(conn, message.Message())
+	}
 }
 
 func (ppl *Link) OpenConnection(message messages.ReqMessage) net.Conn {
