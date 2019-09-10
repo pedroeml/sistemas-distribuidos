@@ -24,6 +24,14 @@ func NewBestEffortBroadcast() *BestEffortBroadcast {
 	return new(BestEffortBroadcast).Init()
 }
 
+func (beb *BestEffortBroadcast) GetIndChannel() chan messages.IndMessage {
+	return beb.indChannel
+}
+
+func (beb *BestEffortBroadcast) GetReqChannel() chan messages.ReqMessage {
+	return beb.reqChannel
+}
+
 func (beb *BestEffortBroadcast) PushIndMessageToChannel(message messages.IndMessage) {
 	beb.indChannel <- message
 }
