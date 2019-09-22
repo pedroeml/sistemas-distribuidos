@@ -1,33 +1,43 @@
 package broadcast
 
 import (
+	"../utils"
 	"./messages"
+	"fmt"
+	"strings"
+	"sync"
 )
 
 type MajorityAckUniformReliableBroadcast struct {
-	indChannel chan messages.IndMessage
-	reqChannel chan messages.ReqMessage
-	ipAddress string
-	// delivered Set
-	// pending Set
-	// ack Set
-	beb BestEffortBroadcast
+	indChannel        chan messages.IndMessage
+	reqChannel        chan messages.ReqMessage
+	ipAddress         string
+	delivered         map[string] bool
+	pending           map[string] bool
+	ack               map[string] int
+	targetIpAddresses []string
+	numberOfProcesses int
+	beb               BestEffortBroadcast
+	mutex             *sync.Mutex
 }
 
-func (urb *MajorityAckUniformReliableBroadcast) Init(address string) *MajorityAckUniformReliableBroadcast {
+func (urb *MajorityAckUniformReliableBroadcast) Init(address string, targetIpAddresses []string) *MajorityAckUniformReliableBroadcast {
 	urb.indChannel = make(chan messages.IndMessage)
 	urb.reqChannel = make(chan messages.ReqMessage)
 	urb.ipAddress = address
-	// delivered = make(Set)
-	// pending = make(Set)
-	// ack = make(Set)
+	urb.delivered = make(map[string] bool)
+	urb.pending = make(map[string] bool)
+	urb.ack = make(map[string] int)
+	urb.targetIpAddresses = targetIpAddresses
+	urb.numberOfProcesses = len(targetIpAddresses)
+	urb.mutex = &sync.Mutex{}
 	urb.beb = *NewBestEffortBroadcast()
 
 	return urb
 }
 
-func NewMajorityAckUniformReliableBroadcast(address string) *MajorityAckUniformReliableBroadcast {
-	return new(MajorityAckUniformReliableBroadcast).Init(address)
+func NewMajorityAckUniformReliableBroadcast(address string, targetIpAddresses []string) *MajorityAckUniformReliableBroadcast {
+	return new(MajorityAckUniformReliableBroadcast).Init(address, targetIpAddresses)
 }
 
 func (urb *MajorityAckUniformReliableBroadcast) IpAddress() string {
@@ -65,29 +75,74 @@ func (urb *MajorityAckUniformReliableBroadcast) KeepSending() {
 }
 
 func (urb *MajorityAckUniformReliableBroadcast) Broadcast(message messages.ReqMessage) {
-// pending = pending U { (urb.IpAddress(), message.Message()) }
-	urb.beb.PushReqMessageToChannel(message)
+	key := formatKey(urb.IpAddress(), message.Message())
+	reqMsg := *messages.NewReqMessage(message.To(), key)
+	urb.mutex.Lock()
+	urb.pending[key] = true
+	urb.beb.PushReqMessageToChannel(reqMsg)
+	urb.mutex.Unlock()
 }
 
 func (urb *MajorityAckUniformReliableBroadcast) KeepDelivering() {
-//	for {
-//		for each (source, message) in pending {
-//			if urb.canDeliver(message) ^ not(message E delivered) {
-// 				delivered = delivered U { (message.From(), message.Message()) }
-//				urb.indChannel <- messages.NewIndMessage(source, message)
-// 			}
-//		}
-//	}
+	for {
+		urb.mutex.Lock()
+		keys := utils.Filter(utils.Keys(urb.pending), func (v string) bool {
+			return urb.pending[v]
+		})
+		urb.mutex.Unlock()
+
+		for i := 0; i < len(keys); i++ {
+			urb.mutex.Lock()
+			_, ok := urb.delivered[keys[i]]
+			urb.mutex.Unlock()
+			if !ok && urb.canDeliver(keys[i]) {
+				urb.mutex.Lock()
+				urb.pending[keys[i]] = false
+				urb.delivered[keys[i]] = true
+				urb.PushIndMessageToChannel(unformatKey(keys[i]))
+				urb.mutex.Unlock()
+			}
+		}
+	}
 }
 
 func (urb *MajorityAckUniformReliableBroadcast) bebDeliver(message messages.IndMessage) {
-//	ack[message] = ack[message] U message
-// 	if not ((message.From(), message.Message()) E pending)
-//		pending = pending U { (message.From(), message.Message()) }
-//		urb.beb.Broadcast(?????)
+	indMsg := unformatKey(message.Message())
+	fmt.Printf("URB FROM %s MSG %s\n", indMsg.From(), indMsg.Message())
+	key := message.Message()
+	urb.mutex.Lock()
+	count, okAck := urb.ack[key]
+
+	if okAck {
+		urb.ack[key] = count + 1
+	} else {
+		urb.ack[key] = 1
+	}
+	_, ok := urb.pending[key]
+	urb.mutex.Unlock()
+
+	if !ok {
+		reqMsg := *messages.NewReqMessage(urb.targetIpAddresses, message.Message())
+		urb.mutex.Lock()
+		urb.pending[key] = true
+		urb.beb.PushReqMessageToChannel(reqMsg)
+		urb.mutex.Unlock()
+	}
 }
 
-func (urb *MajorityAckUniformReliableBroadcast) canDeliver(message messages.IndMessage) bool {
-//	return #(ack[message]) > N/2
-	return true
+func (urb *MajorityAckUniformReliableBroadcast) canDeliver(key string) bool {
+	urb.mutex.Lock()
+	can := urb.ack[key] > urb.numberOfProcesses/2
+	urb.mutex.Unlock()
+	return can
+}
+
+func formatKey(ip string, message string) string {
+	return ip + ";" + message
+}
+
+func unformatKey(key string) messages.IndMessage {
+	s := strings.Split(key, ";")
+	indMsg := *messages.NewIndMessage(s[0], s[1])
+	return indMsg
 }
