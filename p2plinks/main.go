@@ -35,16 +35,16 @@ func main() {
 
 	ch := make(chan int)
 
-	beb := broadcast.NewBestEffortBroadcast()
-	beb.Start(sourceIpAddress)
+	urb := broadcast.NewMajorityAckUniformReliableBroadcast(sourceIpAddress, targetIpAddresses, false)
+	urb.Start()
 
-	go sendKeyboardInputMessage(beb, id, targetIpAddresses)
-	go listenReceivingMessages(beb, id)
+	go sendKeyboardInputMessage(urb, id, targetIpAddresses)
+	go listenReceivingMessages(urb, id)
 
 	<- ch
 }
 
-func sendKeyboardInputMessage(beb *broadcast.BestEffortBroadcast, id int, targetIpAddresses []string) {
+func sendKeyboardInputMessage(urb *broadcast.MajorityAckUniformReliableBroadcast, id int, targetIpAddresses []string) {
 	for {
 		fmt.Println("Type the message:")
 		reader := bufio.NewReader(os.Stdin)
@@ -62,13 +62,13 @@ func sendKeyboardInputMessage(beb *broadcast.BestEffortBroadcast, id int, target
 		}
 		fmt.Printf("\n")
 
-		beb.PushReqMessageToChannel(reqMsg)
+		urb.PushReqMessageToChannel(reqMsg)
 	}
 }
 
-func listenReceivingMessages(beb *broadcast.BestEffortBroadcast, id int) {
+func listenReceivingMessages(urb *broadcast.MajorityAckUniformReliableBroadcast, id int) {
 	for {
-		msg := beb.PopIndMessageFromChannel()
+		msg := urb.PopIndMessageFromChannel()
 		fmt.Printf("PROCESS %d: got message \"%s\" from %s\n", id, msg.Message(), msg.From())
 	}
 }
