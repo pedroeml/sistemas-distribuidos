@@ -18,7 +18,7 @@ type MajorityAckUniformReliableBroadcast struct {
 	beb               BestEffortBroadcast
 }
 
-func (urb *MajorityAckUniformReliableBroadcast) Init(address string, targetIpAddresses []string) *MajorityAckUniformReliableBroadcast {
+func (urb *MajorityAckUniformReliableBroadcast) Init(address string, targetIpAddresses []string, debug bool) *MajorityAckUniformReliableBroadcast {
 	urb.indChannel = make(chan messages.IndMessage)
 	urb.reqChannel = make(chan messages.ReqMessage)
 	urb.ipAddress = address
@@ -27,13 +27,13 @@ func (urb *MajorityAckUniformReliableBroadcast) Init(address string, targetIpAdd
 	urb.ack = make(map[string] int)
 	urb.targetIpAddresses = targetIpAddresses
 	urb.numberOfProcesses = len(targetIpAddresses)
-	urb.beb = *NewBestEffortBroadcast()
+	urb.beb = *NewBestEffortBroadcast(debug)
 
 	return urb
 }
 
-func NewMajorityAckUniformReliableBroadcast(address string, targetIpAddresses []string) *MajorityAckUniformReliableBroadcast {
-	return new(MajorityAckUniformReliableBroadcast).Init(address, targetIpAddresses)
+func NewMajorityAckUniformReliableBroadcast(address string, targetIpAddresses []string, debug bool) *MajorityAckUniformReliableBroadcast {
+	return new(MajorityAckUniformReliableBroadcast).Init(address, targetIpAddresses, debug)
 }
 
 func (urb *MajorityAckUniformReliableBroadcast) IpAddress() string {

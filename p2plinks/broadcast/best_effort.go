@@ -12,16 +12,16 @@ type BestEffortBroadcast struct {
 	link perfect.Link
 }
 
-func (beb *BestEffortBroadcast) Init() *BestEffortBroadcast {
+func (beb *BestEffortBroadcast) Init(debug bool) *BestEffortBroadcast {
 	beb.indChannel = make(chan messages.IndMessage)
 	beb.reqChannel = make(chan messages.ReqMessage)
-	beb.link = *perfect.NewPerfectLink()
+	beb.link = *perfect.NewPerfectLink(debug)
 
 	return beb
 }
 
-func NewBestEffortBroadcast() *BestEffortBroadcast {
-	return new(BestEffortBroadcast).Init()
+func NewBestEffortBroadcast(debug bool) *BestEffortBroadcast {
+	return new(BestEffortBroadcast).Init(debug)
 }
 
 func (beb *BestEffortBroadcast) GetIndChannel() chan messages.IndMessage {

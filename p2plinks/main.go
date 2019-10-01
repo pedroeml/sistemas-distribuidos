@@ -35,7 +35,7 @@ func main() {
 
 	ch := make(chan int)
 
-	urb := broadcast.NewMajorityAckUniformReliableBroadcast(sourceIpAddress, targetIpAddresses)
+	urb := broadcast.NewMajorityAckUniformReliableBroadcast(sourceIpAddress, targetIpAddresses, false)
 	urb.Start()
 
 	go sendKeyboardInputMessage(urb, id, targetIpAddresses)
